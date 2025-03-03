@@ -1,0 +1,23 @@
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import LandingPage from './components/pages/LandingPage';
+import SearchPage from './components/pages/SearchPage';
+import { FoodProvider } from './components/FoodContext';
+import FoodNutritionDisplay from './components/pages/NutritionDisplay';
+
+const App = () => {
+  return (
+    <FoodProvider>
+      <Router>
+        <div className='w-full'>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/food/:id" element={<FoodNutritionDisplay />} />
+          </Routes>
+        </div>
+      </Router>
+    </FoodProvider>
+  );
+}
+
+export default App;
