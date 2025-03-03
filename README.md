@@ -31,8 +31,3 @@ You can access the live web app by clicking [here](YOUR_VERCEL_URL). Try uploadi
 4. Nutritional details like vitamins, minerals, and daily value percentages are displayed in an easy-to-read format.
 5. Users can also explore nutritional charts and insights about their food.
 
-### ⚙️ **Technologies Used**
-- **Frontend**: React, Vite, TypeScript
-- **Backend**: Django
-- **Machine Learning**: CNN for food classification, Neural Network for image-to-text conversion
-- **API**: US Food Database API for nutritional data
