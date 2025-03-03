@@ -30,7 +30,6 @@ export const FoodProvider: React.FC<FoodProviderProps> = ({ children }) => {
     return <FoodContext.Provider value={value}>{children}</FoodContext.Provider>;
 };
 
-// Custom hook to use the food context
 export const useFoodContext = (): FoodContextType => {
     const context = useContext(FoodContext);
     if (context === undefined) {

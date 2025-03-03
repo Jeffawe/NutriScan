@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Info, AlertCircle, Clock, Utensils, BarChart, Tag, Package, HelpCircle, ArrowLeft } from 'lucide-react';
 import {
     Card,
@@ -154,13 +154,13 @@ const MacroDonutChart: React.FC<{ carbs?: number; protein?: number; fat?: number
     );
 };
 
-const MineralsChart: React.FC<{ minerals?: any[] }> = ({ minerals }) => {
+const MineralsChart: React.FC<{ minerals?: NutrientDisplayProps[] }> = ({ minerals }) => {
     if (!minerals || minerals.length === 0) return null;
 
     // Filter minerals with DV percentage and sort by percentage
     const chartData = minerals
-        .filter(mineral => mineral.daily_value_percent !== undefined && mineral.daily_value_percent > 0)
-        .sort((a, b) => b.daily_value_percent - a.daily_value_percent)
+        .filter(mineral => (mineral?.daily_value_percent ?? 0) > 0) // Ensure it's defined and greater than 0
+        .sort((a, b) => (b?.daily_value_percent ?? 0) - (a?.daily_value_percent ?? 0)) // Sort safely
         .slice(0, 6); // Top 6 minerals
 
     if (chartData.length === 0) return null;
@@ -193,7 +193,7 @@ const MineralsChart: React.FC<{ minerals?: any[] }> = ({ minerals }) => {
                     <XAxis type="number" domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
                     <YAxis dataKey="name" type="category" width={80} />
                     <RechartsTooltip
-                        formatter={(value, name, props) => [
+                        formatter={(value, _, props) => [
                             `${value}% of daily recommended intake`,
                             props.payload.name
                         ]}
@@ -205,7 +205,7 @@ const MineralsChart: React.FC<{ minerals?: any[] }> = ({ minerals }) => {
                         radius={[0, 4, 4, 0]}
                         barSize={20}
                     >
-                        {chartData.map((index) => (
+                        {chartData.map((_, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                     </Bar>
@@ -284,7 +284,7 @@ const FoodNutritionDisplay: React.FC = () => {
     const nutrients = foodData.nutrients;
     const analysis = foodData.analysis;
 
-    const fetchFoodData = async (): Promise<FoodData> => {
+    const fetchFoodData = useCallback(async (): Promise<FoodData> => {
         try {
             const response = await axios.get(`${BASE_URL}/analyze-food/?fcID=${id}`)
             return response.data as FoodData;
@@ -292,13 +292,13 @@ const FoodNutritionDisplay: React.FC = () => {
             console.error("Error fetching food data:", error);
             return DEFAULT_FOOD_DATA;
         }
-    };
+    }, [id]);
 
     useEffect(() => {
         if (!selectedFood) {
             fetchFoodData().then(setFoodData);
         }
-    }, [selectedFood])
+    }, [selectedFood, fetchFoodData])
 
     // Check if there are nutrients in each category
     const hasNutrients = (category: keyof typeof foodData.nutrients) =>
@@ -310,7 +310,7 @@ const FoodNutritionDisplay: React.FC = () => {
     };
 
     return (
-        <div className="max-w-2xl mx-auto space-y-6 px-4 py-6">
+        <div className="max-w-2xl mx-auto space-y-6 px-4 py-6 bg-gradient-to-b from-green-50 to-white">
             <div className='flex flex-row items-center'>
                 {/* Back button */}
                 <Button
