@@ -15,8 +15,7 @@ You can access the live web app by clicking [here](YOUR_VERCEL_URL). Try uploadi
   - The backend integrates with the **US Food Database** to retrieve up-to-date nutritional information for various food items.
 
 - **Machine Learning**:
-  - **Convolutional Neural Network (CNN)**: Used for food classification and data extraction.
-  - **Neural Network-based Image-to-Text Model** (Name TBD): Extracts nutritional information and food descriptions from images.
+  - **Neural Network-based Image-to-Text Model** (BLIP): Extracts nutritional information and food descriptions from images.
 
 ### 📦 **Features**
 - **Food Analysis**: Enter or upload food items, and the app will display detailed nutritional information, including daily value percentages.

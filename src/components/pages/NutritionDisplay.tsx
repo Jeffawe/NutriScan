@@ -316,7 +316,7 @@ const FoodNutritionDisplay: React.FC = () => {
                 <Button
                     size="sm"
                     onClick={handleGoBack}
-                    className="bg-transparent hover:bg-transparent hover:text-gray-600"
+                    className="bg-transparent hover:bg-transparent text-gray-400 hover:text-gray-800"
                 >
                     <ArrowLeft size={16} className="mr-2" />
                     Back to Search
