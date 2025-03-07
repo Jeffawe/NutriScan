@@ -138,10 +138,38 @@ const FoodList: React.FC<FoodListProps> = ({ foodItems = [], pages, handleNextPa
                         ))}
                     </div>
                     
-                    {/* Pagination */}
+                    {/* Pagination - responsive design */}
                     {pages > 1 && (
                         <div className="flex justify-center mt-6">
-                            <div className="flex items-center gap-2">
+                            {/* Mobile pagination: just show current/total and prev/next buttons */}
+                            <div className="md:hidden flex items-center justify-between w-full max-w-sm">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => changePage(Math.max(1, currentPage - 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-3"
+                                >
+                                    Previous
+                                </Button>
+                                
+                                <span className="text-sm">
+                                    Page {currentPage} of {pages}
+                                </span>
+                                
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => changePage(Math.min(pages, currentPage + 1))}
+                                    disabled={currentPage === pages}
+                                    className="px-3"
+                                >
+                                    Next
+                                </Button>
+                            </div>
+                            
+                            {/* Desktop pagination: full version with page numbers */}
+                            <div className="hidden md:flex items-center gap-2">
                                 <Button 
                                     variant="outline" 
                                     size="sm" 
