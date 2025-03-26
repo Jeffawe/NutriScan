@@ -78,9 +78,13 @@ const SearchPage = () => {
                 setManyFoodData(response.data.data);
                 setPages(response.data.totalPages);
                 setSearchText(response.data.searchTerm);
+                if (response.data.hasOwnProperty('use_llm')) {
+                    if (!response.data.use_llm) {
+                        setError('Switching to a lower-tier model due to usage limits.');
+                    }
+                }
             }
         } catch (error) {
-            console.error(error);
             setError('Failed to analyze image. Please try again.');
         } finally {
             setIsLoading(false);
@@ -102,7 +106,6 @@ const SearchPage = () => {
             setManyFoodData(response.data.data);
             setPages(response.data.totalPages);
         } catch (error) {
-            console.error(error);
             setError('Failed to find food with that name. Please try again.');
         } finally {
             setIsLoading(false);
@@ -119,7 +122,6 @@ const SearchPage = () => {
             setManyFoodData(response.data.data);
             setPages(response.data.totalPages);
         } catch (error) {
-            console.error(error);
             setError('Failed to load page. Please try again.');
         } finally {
             setIsLoading(false);
@@ -137,7 +139,6 @@ const SearchPage = () => {
             const result = [response.data as FoodData];
             setManyFoodData(result);
         } catch (error) {
-            console.error(error);
             setError('Failed to find food with that ID. Please try again.');
         } finally {
             setIsLoading(false);

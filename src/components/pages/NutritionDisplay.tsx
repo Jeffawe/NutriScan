@@ -289,7 +289,7 @@ const FoodNutritionDisplay: React.FC = () => {
             const response = await axios.get(`${BASE_URL}/analyze-food/?fcID=${id}`)
             return response.data as FoodData;
         } catch (error) {
-            console.error("Error fetching food data:", error);
+            //console.error("Error fetching food data:", error);
             return DEFAULT_FOOD_DATA;
         }
     }, [id]);
