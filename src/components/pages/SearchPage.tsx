@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, X, Search, ArrowLeft, HelpCircle } from 'lucide-react';
 import axios from 'axios';
 import { FoodData } from '../types';
@@ -18,6 +18,7 @@ const SearchPage = () => {
     const [useOCR, setUseOCR] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
+    const [loadingDelay, setLoadingDelay] = useState(0);
 
     const navigate = useNavigate();
 
@@ -156,6 +157,25 @@ const SearchPage = () => {
         setSearchText('');
         setID(null);
         setError(null);
+    };
+
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (isLoading) {
+            interval = setInterval(() => {
+                setLoadingDelay((prev) => prev + 1);
+            }, 1000);
+        } else {
+            setLoadingDelay(0);
+        }
+        return () => clearInterval(interval);
+    }, [isLoading]);
+
+    const getLoadingMessage = () => {
+        if (loadingDelay < 5) return "Cooking up some data goodness... 🍳";
+        if (loadingDelay < 10) return "Still preheating the servers... hang tight! 🔥";
+        if (loadingDelay < 20) return "Slow-roasting the nutrition facts... almost ready! 🥘";
+        return "The data chef took a break — but it’s gonna be worth it! 👨‍🍳";
     };
 
     return (
@@ -311,6 +331,7 @@ const SearchPage = () => {
                         {isLoading ? (
                             <div className="flex justify-center items-center py-12">
                                 <div className="animate-spin h-10 w-10 border-4 border-green-500 border-t-transparent rounded-full" />
+                                <p className="text-sm text-gray-600">{getLoadingMessage()}</p>
                             </div>
                         ) : (
                             <div>
