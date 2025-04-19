@@ -173,8 +173,8 @@ const SearchPage = () => {
 
     const getLoadingMessage = () => {
         if (loadingDelay < 5) return "Firing up the servers... 🔌🔥";
-        if (loadingDelay < 10) return "Still preheating the servers... hang tight! 🔥";
-        if (loadingDelay < 20) return "Slow-roasting the nutrition facts... almost ready! 🥘";
+        if (loadingDelay < 15) return "Still preheating the servers... hang tight! 🔥";
+        if (loadingDelay < 25) return "Slow-roasting the nutrition facts... almost ready! 🥘";
         return "Server is heating up... 🍳";
     };
 
@@ -329,9 +329,9 @@ const SearchPage = () => {
                 ) : (
                     <div>
                         {isLoading ? (
-                            <div className="flex justify-center items-center py-12">
+                            <div className="flex flex-col justify-center items-center py-12">
                                 <div className="animate-spin h-10 w-10 border-4 border-green-500 border-t-transparent rounded-full" />
-                                <p className="text-sm text-gray-600">{getLoadingMessage()}</p>
+                                <p className="text-sm text-gray-600 mt-2">{getLoadingMessage()}</p>
                             </div>
                         ) : (
                             <div>
