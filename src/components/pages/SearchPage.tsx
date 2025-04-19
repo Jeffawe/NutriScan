@@ -172,10 +172,10 @@ const SearchPage = () => {
     }, [isLoading]);
 
     const getLoadingMessage = () => {
-        if (loadingDelay < 5) return "Cooking up some data goodness... 🍳";
+        if (loadingDelay < 5) return "Firing up the servers... 🔌🔥";
         if (loadingDelay < 10) return "Still preheating the servers... hang tight! 🔥";
         if (loadingDelay < 20) return "Slow-roasting the nutrition facts... almost ready! 🥘";
-        return "The data chef took a break — but it’s gonna be worth it! 👨‍🍳";
+        return "Server is heating up... 🍳";
     };
 
     return (
