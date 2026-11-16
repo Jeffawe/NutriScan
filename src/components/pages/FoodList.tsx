@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
@@ -9,29 +9,27 @@ import { Button } from '@/components/ui/button';
 interface FoodListProps {
     foodItems: FoodData[];
     pages: number;
-    handleNextPage: (page: number) => void;
+    /** Controlled by the parent so it survives navigating to a food and back */
+    currentPage: number;
+    onPageChange: (page: number) => void;
 }
 
-const FoodList: React.FC<FoodListProps> = ({ foodItems = [], pages, handleNextPage }) => {
+const FoodList: React.FC<FoodListProps> = ({ foodItems = [], pages, currentPage, onPageChange }) => {
     const navigate = useNavigate();
     const { setSelectedFood } = useFoodContext();
-    const [currentPage, setCurrentPage] = useState(1);
-
-    // Reset current page when food items change completely (e.g., new search)
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [foodItems.length === 0]);
 
     const handleFoodItemClick = (food: FoodData) => {
         setSelectedFood(food);
-        navigate(`/food/${food.basic_info.id}`);
+        if (food.basic_info.id != null) {
+            navigate(`/food/${food.basic_info.id}`);
+        } else if (food.basic_info.upc) {
+            navigate(`/product/${food.basic_info.upc}`);
+        }
     };
 
-    // Handle page change
     const changePage = (page: number) => {
         if (page !== currentPage) {
-            setCurrentPage(page);
-            handleNextPage(page);
+            onPageChange(page);
         }
     };
 
@@ -53,7 +51,7 @@ const FoodList: React.FC<FoodListProps> = ({ foodItems = [], pages, handleNextPa
         const maxVisiblePages = 5; // Adjust as needed
         
         let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-        let endPage = Math.min(pages, startPage + maxVisiblePages - 1);
+        const endPage = Math.min(pages, startPage + maxVisiblePages - 1);
         
         // Adjust startPage if endPage is at maximum
         if (endPage === pages) {
@@ -91,7 +89,7 @@ const FoodList: React.FC<FoodListProps> = ({ foodItems = [], pages, handleNextPa
                                             <p className="text-sm text-gray-500 mb-2">
                                                 {food.basic_info.brand || 'Unknown Brand'}
                                             </p>
-                                            {food.basic_info.calories !== undefined && (
+                                            {food.basic_info.calories != null && (
                                                 <div>
                                                     <span className="text-lg font-semibold">
                                                         {food.basic_info.calories}

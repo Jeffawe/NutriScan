@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScannerSVG from './svg/ScannerSVG';
 import NutritionScannerIcon from './svg/NutritionScannerIcon';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-white to-green-300">
@@ -26,13 +27,34 @@ const LandingPage: React.FC = () => {
             </button>
           </div>
           <div className="md:hidden">
-            <button className="text-gray-700">
+            <button
+              className="text-gray-700"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
+            >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                {menuOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                )}
               </svg>
             </button>
           </div>
         </div>
+        {menuOpen && (
+          <div className="md:hidden border-t px-6 py-3 flex flex-col space-y-3">
+            <a href="#features" onClick={() => setMenuOpen(false)} className="text-gray-700 hover:text-green-600">Features</a>
+            <a href="#how-it-works" onClick={() => setMenuOpen(false)} className="text-gray-700 hover:text-green-600">How It Works</a>
+            <button
+              onClick={() => navigate('/search')}
+              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition text-left"
+            >
+              Search Foods
+            </button>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section */}
@@ -43,7 +65,7 @@ const LandingPage: React.FC = () => {
               What's Really in Your Food?
             </h1>
             <p className="text-xl text-gray-600 mb-8">
-              Scan food items by name or image and get detailed nutritional information instantly. Make healthier choices with data from the US Food Database.
+              Search by name, scan a barcode, or snap a photo and get detailed nutritional information instantly. Make healthier choices with data from the USDA and Open Food Facts.
             </p>
             <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 justify-center md:justify-start">
               <button
@@ -82,8 +104,8 @@ const LandingPage: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-center mb-2">Comprehensive Data</h3>
-              <p className="text-gray-600 text-center">Access detailed nutritional profiles from the US Food Database</p>
+              <h3 className="text-xl font-semibold text-center mb-2">Barcode Lookup</h3>
+              <p className="text-gray-600 text-center">Scan any packaged product's barcode for an exact match from millions of products worldwide</p>
             </div>
             <div className="bg-green-50 rounded-lg p-6 shadow-md">
               <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mb-4 mx-auto">
@@ -91,8 +113,8 @@ const LandingPage: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-center mb-2">Track Changes</h3>
-              <p className="text-gray-600 text-center">Monitor nutritional changes in your favorite products over time</p>
+              <h3 className="text-xl font-semibold text-center mb-2">Health Scores</h3>
+              <p className="text-gray-600 text-center">See Nutri-Score grades, processing levels, allergens and key nutrition highlights at a glance</p>
             </div>
           </div>
         </div>
@@ -108,7 +130,7 @@ const LandingPage: React.FC = () => {
                 <span className="text-2xl font-bold text-green-600">1</span>
               </div>
               <h3 className="text-xl font-semibold mb-2">Search or Scan</h3>
-              <p className="text-gray-600">Enter a food name or scan an item with your camera</p>
+              <p className="text-gray-600">Enter a food name, scan a barcode, or take a photo of your food</p>
             </div>
             <div className="flex flex-col items-center max-w-xs text-center">
               <div className="bg-white w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-md">
@@ -148,7 +170,7 @@ const LandingPage: React.FC = () => {
                   Jeffery Ozoekwe Awagu
                 </a>
               </p>
-              <p className="text-black text-sm mt-2">© {new Date().getFullYear()} NutriScan. All rights reserved.</p>
+              <p className="text-black text-sm mt-2">© {new Date().getFullYear()} ScanMyFood. All rights reserved.</p>
             </div>
           </div>
         </div>

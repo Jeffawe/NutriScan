@@ -23,23 +23,29 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, B
 
 const BASE_URL = import.meta.env.VITE_BASE_URL
 
-// Map of abbreviated units to full unit names
+// Map of abbreviated units (lowercase) to full unit names.
+// USDA returns units in uppercase ("G", "MG", "UG", "KCAL"), so lookups are case-insensitive.
 const UNIT_DISPLAY_MAP: Record<string, string> = {
     'g': 'grams',
+    'grm': 'grams',
     'mg': 'milligrams',
     'mcg': 'micrograms',
-    'IU': 'International Units',
+    'ug': 'micrograms',
+    'µg': 'micrograms',
+    'iu': 'International Units',
     'kcal': 'kilocalories',
+    'kj': 'kilojoules',
     'oz': 'ounces',
     'ml': 'milliliters',
+    'mlt': 'milliliters',
     'tbsp': 'tablespoons',
     'tsp': 'teaspoons',
-    'µg': 'micrograms'
 };
 
 // Format unit for display
-const formatUnit = (unit: string): string => {
-    return UNIT_DISPLAY_MAP[unit] || unit;
+const formatUnit = (unit: string | null | undefined): string => {
+    if (!unit) return '';
+    return UNIT_DISPLAY_MAP[unit.toLowerCase()] || unit;
 };
 
 const NutrientDisplay: React.FC<NutrientDisplayProps> = ({ name, amount, unit, daily_value_percent }) => (
@@ -70,7 +76,7 @@ const NutrientDisplay: React.FC<NutrientDisplayProps> = ({ name, amount, unit, d
 // Colors for the pie charts
 const COLORS = ['#3b82f6', '#10b981', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
-const MacroDonutChart: React.FC<{ carbs?: number; protein?: number; fat?: number }> = ({ carbs, protein, fat }) => {
+const MacroDonutChart: React.FC<{ carbs?: number; protein?: number; fat?: number; calories?: number | null }> = ({ carbs, protein, fat, calories }) => {
     if (!carbs && !protein && !fat) return null;
 
     const data = [
@@ -78,8 +84,6 @@ const MacroDonutChart: React.FC<{ carbs?: number; protein?: number; fat?: number
         { name: 'Protein', value: protein || 0, color: '#10b981' },
         { name: 'Fat', value: fat || 0, color: '#ef4444' },
     ].filter(item => item.value > 0);
-
-    const totalCalories = data.reduce((sum, item) => sum + item.value, 0);
 
     return (
         <div className="flex justify-center items-center my-4">
@@ -125,7 +129,7 @@ const MacroDonutChart: React.FC<{ carbs?: number; protein?: number; fat?: number
 
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-xs text-gray-500">Calories</span>
-                    <span className="font-bold text-lg">{Math.round(totalCalories) || "N/A"}</span>
+                    <span className="font-bold text-lg">{calories != null ? Math.round(calories) : "N/A"}</span>
                 </div>
             </div>
 
@@ -190,7 +194,7 @@ const MineralsChart: React.FC<{ minerals?: NutrientDisplayProps[] }> = ({ minera
                     margin={{ top: 5, right: 30, left: 90, bottom: 5 }}
                 >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
+                    <XAxis type="number" domain={[0, (dataMax: number) => Math.max(100, Math.ceil(dataMax))]} tickFormatter={(value) => `${value}%`} />
                     <YAxis dataKey="name" type="category" width={80} />
                     <RechartsTooltip
                         formatter={(value, _, props) => [
@@ -273,41 +277,149 @@ const DVExplanationCard: React.FC = () => (
     </Card>
 );
 
+const NUTRI_SCORE_COLORS: Record<string, string> = {
+    a: 'bg-green-700', b: 'bg-green-500', c: 'bg-yellow-400 text-gray-900', d: 'bg-orange-500', e: 'bg-red-600',
+};
+
+const NOVA_LABELS: Record<number, string> = {
+    1: 'Unprocessed or minimally processed',
+    2: 'Processed culinary ingredient',
+    3: 'Processed food',
+    4: 'Ultra-processed food',
+};
+
+/** Nutri-Score, NOVA and allergen details from Open Food Facts */
+const ProductScores: React.FC<{ analysis: FoodData['analysis'] }> = ({ analysis }) => {
+    const { nutri_score, nova_group, allergens = [], traces = [] } = analysis;
+    if (!nutri_score && !nova_group && allergens.length === 0 && traces.length === 0) return null;
+
+    return (
+        <div className="mt-4 space-y-3">
+            <div className="flex flex-wrap gap-3">
+                {nutri_score && (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div className="flex items-center gap-2 cursor-help">
+                                    <span className="text-sm text-gray-600">Nutri-Score</span>
+                                    <span className={`text-white font-bold rounded px-2 py-0.5 uppercase ${NUTRI_SCORE_COLORS[nutri_score]}`}>
+                                        {nutri_score}
+                                    </span>
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p className="max-w-xs">Nutri-Score grades overall nutritional quality from A (best) to E (worst), based on calories, sugar, saturated fat, salt, fiber, protein and fruit/vegetable content.</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                )}
+                {nova_group && (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div className="flex items-center gap-2 cursor-help">
+                                    <span className="text-sm text-gray-600">NOVA</span>
+                                    <span className={`font-bold rounded px-2 py-0.5 ${nova_group === 4 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
+                                        {nova_group}
+                                    </span>
+                                    <span className="text-sm text-gray-600">{NOVA_LABELS[nova_group]}</span>
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p className="max-w-xs">NOVA classifies foods by how processed they are, from 1 (unprocessed) to 4 (ultra-processed).</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                )}
+            </div>
+            {allergens.length > 0 && (
+                <p className="text-sm"><span className="font-medium text-red-700">Allergens:</span> {allergens.join(', ')}</p>
+            )}
+            {traces.length > 0 && (
+                <p className="text-sm"><span className="font-medium text-orange-700">May contain:</span> {traces.join(', ')}</p>
+            )}
+        </div>
+    );
+};
+
 const FoodNutritionDisplay: React.FC = () => {
-    const { id } = useParams() as { id: string };
+    const { id, barcode } = useParams() as { id?: string; barcode?: string };
     const { selectedFood } = useFoodContext();
     const navigate = useNavigate();
 
-    const [foodData, setFoodData] = useState<FoodData>(selectedFood || DEFAULT_FOOD_DATA);
+    // Only trust the food in context if it's the one this URL points at
+    // (it can be stale, e.g. after opening a shared link or using browser history)
+    const contextMatches = !!selectedFood && (
+        barcode
+            ? selectedFood.basic_info.upc === barcode
+            : String(selectedFood.basic_info.id) === id
+    );
+
+    const [foodData, setFoodData] = useState<FoodData>(contextMatches ? selectedFood! : DEFAULT_FOOD_DATA);
+    const [isLoading, setIsLoading] = useState(!contextMatches);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [showDVExplanation, setShowDVExplanation] = useState(false);
+    const [imageState, setImageState] = useState<'loading' | 'loaded' | 'error'>('loading');
     const basic_info = foodData.basic_info;
     const nutrients = foodData.nutrients;
     const analysis = foodData.analysis;
+    const isOpenFoodFacts = basic_info.source === 'openfoodfacts';
 
     const fetchFoodData = useCallback(async (): Promise<FoodData> => {
-        try {
-            const response = await axios.get(`${BASE_URL}/analyze-food/?fcID=${id}`)
-            return response.data as FoodData;
-        } catch (error) {
-            //console.error("Error fetching food data:", error);
-            return DEFAULT_FOOD_DATA;
-        }
-    }, [id]);
+        const response = barcode
+            ? await axios.get(`${BASE_URL}/barcode/`, { params: { code: barcode } })
+            : await axios.get(`${BASE_URL}/analyze-food/`, { params: { fcID: id } });
+        return response.data as FoodData;
+    }, [id, barcode]);
 
     useEffect(() => {
-        if (!selectedFood) {
-            fetchFoodData().then(setFoodData);
-        }
-    }, [selectedFood, fetchFoodData])
+        if (contextMatches) return;
+        let cancelled = false;
+        setIsLoading(true);
+        setLoadError(null);
+        fetchFoodData()
+            .then((data) => { if (!cancelled) setFoodData(data); })
+            .catch((err) => {
+                if (cancelled) return;
+                const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+                setLoadError(status === 404
+                    ? "We couldn't find this food in our databases."
+                    : 'Failed to load this food. Please try again.');
+            })
+            .finally(() => { if (!cancelled) setIsLoading(false); });
+        return () => { cancelled = true; };
+    }, [contextMatches, fetchFoodData]);
 
     // Check if there are nutrients in each category
     const hasNutrients = (category: keyof typeof foodData.nutrients) =>
         foodData.nutrients[category] && foodData.nutrients[category].length > 0;
 
-    // Handler for back button
+    // Search results are kept in context, so going back restores them
     const handleGoBack = () => {
-        navigate('/search'); // Navigate to the previous page in history
+        navigate('/search');
     };
+
+    if (isLoading || loadError) {
+        return (
+            <div className="max-w-2xl mx-auto px-4 py-6 min-h-screen">
+                <Button
+                    size="sm"
+                    onClick={handleGoBack}
+                    className="bg-transparent hover:bg-transparent text-gray-400 hover:text-gray-800"
+                >
+                    <ArrowLeft size={16} className="mr-2" />
+                    Back to Search
+                </Button>
+                {isLoading ? (
+                    <div className="flex justify-center py-16">
+                        <div className="animate-spin h-10 w-10 border-4 border-green-500 border-t-transparent rounded-full" />
+                    </div>
+                ) : (
+                    <p className="mt-8 bg-red-50 border-l-4 border-red-500 p-4 rounded-md text-red-700">{loadError}</p>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-2xl mx-auto space-y-6 px-4 py-6 bg-gradient-to-b from-green-50 to-white">
@@ -335,6 +447,18 @@ const FoodNutritionDisplay: React.FC = () => {
             {/* Basic Information */}
             <Card>
                 <CardHeader className="pb-2">
+                    {basic_info.image_url && imageState !== 'error' && (
+                        // Hidden until loaded: the Open Food Facts image server can take several seconds
+                        <img
+                            src={basic_info.image_url}
+                            alt={basic_info.name}
+                            onLoad={() => setImageState('loaded')}
+                            onError={() => setImageState('error')}
+                            className={imageState === 'loaded'
+                                ? 'w-32 h-32 object-contain mx-auto mb-3 rounded-lg bg-white'
+                                : 'hidden'}
+                        />
+                    )}
                     <CardTitle className="flex items-center gap-2">
                         <Info size={20} />
                         {foodData.basic_info.name}
@@ -365,6 +489,9 @@ const FoodNutritionDisplay: React.FC = () => {
                                         `${basic_info.serving_size} ${formatUnit(basic_info.serving_unit)}` :
                                         'Not specified')}
                             </p>
+                            {isOpenFoodFacts && basic_info.package_serving && (
+                                <p className="text-xs text-gray-500">Package serving: {basic_info.package_serving}</p>
+                            )}
                         </div>
                         <div>
                             <p className="text-sm text-gray-500 flex items-center gap-1">
@@ -383,6 +510,7 @@ const FoodNutritionDisplay: React.FC = () => {
                         carbs={analysis.nutritional_profile.carbs_calories_percent}
                         protein={analysis.nutritional_profile.protein_calories_percent}
                         fat={analysis.nutritional_profile.fat_calories_percent}
+                        calories={basic_info.calories}
                     />
 
                     {/* Minerals chart */}
@@ -402,6 +530,8 @@ const FoodNutritionDisplay: React.FC = () => {
                             </div>
                         </div>
                     )}
+
+                    <ProductScores analysis={analysis} />
                 </CardContent>
                 {basic_info.ingredients && (
                     <CardFooter className="border-t pt-4 pb-0">
@@ -547,8 +677,25 @@ const FoodNutritionDisplay: React.FC = () => {
                     </div>
                 </CardContent>
                 <CardFooter className="border-t pt-4 text-sm text-gray-500 flex items-center gap-1">
-                    <Clock size={14} />
-                    Data published: {basic_info.published_date || 'Unknown date'}
+                    {isOpenFoodFacts ? (
+                        <span>
+                            Data from{' '}
+                            <a
+                                href={`https://world.openfoodfacts.org/product/${basic_info.upc}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline hover:text-green-700"
+                            >
+                                Open Food Facts
+                            </a>
+                            {' '}(ODbL). Values per 100 g. Product data is community-contributed and may contain errors.
+                        </span>
+                    ) : (
+                        <>
+                            <Clock size={14} />
+                            Data published: {basic_info.published_date || 'Unknown date'} · Source: USDA FoodData Central
+                        </>
+                    )}
                 </CardFooter>
             </Card>
         </div>

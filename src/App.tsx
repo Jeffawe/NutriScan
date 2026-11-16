@@ -8,54 +8,15 @@ import { useEffect } from 'react';
 
 const App = () => {
   useEffect(() => {
-    const checkBackendHealth = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/health/`);
-
-        if (!response.ok) {
-          // Backend is up but returning an error
-          sendDiscordAlert(`Backend is up but returning status ${response.status}`);
-          return;
-        }
-
-      } catch (error: unknown) {
-        // Type narrowing for the error object
-        let errorMessage = "Unknown error";
-        if (error instanceof Error) {
-          errorMessage = error.message;
-        } else if (typeof error === 'string') {
-          errorMessage = error;
-        } else if (error && typeof error === 'object') {
-          errorMessage = String(error);
-        }
-
-        sendDiscordAlert(`Backend is down: ${errorMessage}`);
-      }
-    };
-
-    const sendDiscordAlert = async (message: string) => {
-      try {
-        // Replace with your Discord webhook URL
-        const webhookUrl = import.meta.env.VITE_DISCORD_WEBHOOK_URL;
-
-        await fetch(webhookUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            content: `🚨 **ScanMyFood Alert**: ${message}`,
-            username: 'NutriScan Monitor',
-          }),
-        });
-
-      } catch (error) {
-        console.error("Failed to send Discord alert");
-      }
-    };
-
-    // Run the health check when the app starts
-    checkBackendHealth();
+    // Wake the backend early (free hosting sleeps when idle) so the first search is fast.
+    // Uptime alerts belong in an external monitor (e.g. UptimeRobot on /health/), not here:
+    // anything in the frontend bundle — like a Discord webhook URL — is public.
+    const backendUrl = import.meta.env.VITE_BASE_URL || import.meta.env.VITE_BACKEND_URL;
+    if (backendUrl) {
+      fetch(`${backendUrl}/health/`).catch(() => {
+        // Ignore: this is only a warm-up ping
+      });
+    }
   }, []);
 
   return (
@@ -66,6 +27,7 @@ const App = () => {
             <Route path="/" element={<LandingPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/food/:id" element={<FoodNutritionDisplay />} />
+            <Route path="/product/:barcode" element={<FoodNutritionDisplay />} />
           </Routes>
         </div>
       </Router>

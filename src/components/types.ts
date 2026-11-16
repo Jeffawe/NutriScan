@@ -49,6 +49,12 @@ export interface FoodData {
         household_serving: string | null;
         calories: number | null;
         published_date: string | null;
+        /** Where the data came from */
+        source?: 'usda' | 'openfoodfacts';
+        image_url?: string | null;
+        /** Serving size printed on the package (Open Food Facts values are per 100 g) */
+        package_serving?: string | null;
+        quantity?: string | null;
     };
     nutrients: {
         macronutrients: NutrientDisplayProps[];
@@ -71,7 +77,23 @@ export interface FoodData {
             carbs_calories_percent?: number;
         };
         key_highlights: string[];
+        allergens?: string[];
+        additives?: string[];
+        /** "May contain" allergens (Open Food Facts) */
+        traces?: string[];
+        /** Nutri-Score grade a–e (Open Food Facts) */
+        nutri_score?: 'a' | 'b' | 'c' | 'd' | 'e' | null;
+        /** NOVA food processing group 1–4 (Open Food Facts) */
+        nova_group?: 1 | 2 | 3 | 4 | null;
     };
+}
+
+/** Search results kept in context so "Back to Search" restores them */
+export interface SearchState {
+    results: FoodData[] | null;
+    pages: number;
+    currentPage: number;
+    searchText: string;
 }
 
 export const DEFAULT_FOOD_DATA: FoodData = {

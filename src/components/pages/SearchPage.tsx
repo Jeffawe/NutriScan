@@ -1,69 +1,122 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Upload, X, Search, ArrowLeft, HelpCircle } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
+import { Camera, Upload, X, Search, ArrowLeft, HelpCircle, Barcode } from 'lucide-react';
 import axios from 'axios';
 import { FoodData } from '../types';
 import FoodList from './FoodList';
 import { useNavigate } from 'react-router-dom';
+import { EMPTY_SEARCH_STATE, useFoodContext } from '../FoodContext';
+
+// The barcode library is large, so it's only downloaded when someone actually scans
+const BarcodeScanner = lazy(() => import('../BarcodeScanner'));
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
+/** Prefer the backend's own error message (e.g. rate limit / not found) over a generic one. */
+const errorMessage = (err: unknown, fallback: string): string => {
+    if (axios.isAxiosError(err)) {
+        const data = err.response?.data as { error?: string; message?: string } | undefined;
+        if (data?.message) return data.message;
+        if (data?.error) return data.error;
+    }
+    return fallback;
+};
+
+// Custom toggle component
+const ToggleSwitch = ({
+    checked,
+    onChange,
+    id
+}: {
+    checked: boolean,
+    onChange: () => void,
+    id: string
+}) => (
+    <label
+        htmlFor={id}
+        className="flex items-center cursor-pointer"
+    >
+        <div className="relative">
+            <input
+                type="checkbox"
+                id={id}
+                checked={checked}
+                onChange={onChange}
+                className="sr-only"
+            />
+            <div
+                className={`w-10 h-4 rounded-full shadow-inner transition-colors duration-300
+                ${checked ? 'bg-green-500' : 'bg-gray-300'}`}
+            ></div>
+            <div
+                className={`dot absolute left-0 top-1/2 transform -translate-y-1/2
+                w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-300
+                ${checked ? 'translate-x-full' : 'translate-x-0'}`}
+            ></div>
+        </div>
+    </label>
+);
+
 const SearchPage = () => {
-    const [searchText, setSearchText] = useState('');
+    const { searchState, setSearchState, setSelectedFood } = useFoodContext();
+    const { results: manyFoodData, pages, currentPage, searchText } = searchState;
+
     const [id, setID] = useState<number | null>(null);
-    const [manyFoodData, setManyFoodData] = useState<FoodData[] | null>(null);
-    const [pages, setPages] = useState(1);
     const [isSearchById, setIsSearchById] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
     const [useOCR, setUseOCR] = useState(false);
+    const [showScanner, setShowScanner] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const [loadingDelay, setLoadingDelay] = useState(0);
 
     const navigate = useNavigate();
 
-    // Custom toggle component
-    const ToggleSwitch = ({
-        checked,
-        onChange,
-        id
-    }: {
-        checked: boolean,
-        onChange: () => void,
-        id: string
-    }) => (
-        <label
-            htmlFor={id}
-            className="flex items-center cursor-pointer"
-        >
-            <div className="relative">
-                <input
-                    type="checkbox"
-                    id={id}
-                    checked={checked}
-                    onChange={onChange}
-                    className="sr-only"
-                />
-                <div
-                    className={`w-10 h-4 rounded-full shadow-inner transition-colors duration-300 
-                    ${checked ? 'bg-green-500' : 'bg-gray-300'}`}
-                ></div>
-                <div
-                    className={`dot absolute left-0 top-1/2 transform -translate-y-1/2 
-                    w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-300 
-                    ${checked ? 'translate-x-full' : 'translate-x-0'}`}
-                ></div>
-            </div>
-        </label>
-    );
+    const setSearchText = (text: string) => setSearchState((prev) => ({ ...prev, searchText: text }));
+
+    const showResults = (results: FoodData[], totalPages: number, text?: string, page = 1) => {
+        setSearchState((prev) => ({
+            results,
+            pages: totalPages || 1,
+            currentPage: page,
+            searchText: text ?? prev.searchText,
+        }));
+    };
+
+    const lookupBarcode = useCallback(async (barcode: string) => {
+        setShowScanner(false);
+        try {
+            setIsLoading(true);
+            setError(null);
+            setNotice(null);
+            const response = await axios.get(`${BASE_URL}/barcode/`, { params: { code: barcode } });
+            setSelectedFood(response.data as FoodData);
+            navigate(`/product/${barcode}`);
+        } catch (err) {
+            setError(errorMessage(err, `Couldn't look up barcode ${barcode}. Please try again.`));
+        } finally {
+            setIsLoading(false);
+        }
+    }, [navigate, setSelectedFood]);
 
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
+        const input = event.target;
+        const file = input.files?.[0];
         if (!file) return;
 
         try {
             setIsLoading(true);
             setError(null);
+            setNotice(null);
+
+            // If the photo has a readable barcode, an exact product lookup beats guessing from the picture
+            const { decodeBarcodeFromFile } = await import('../BarcodeScanner');
+            const barcode = await decodeBarcodeFromFile(file);
+            if (barcode) {
+                await lookupBarcode(barcode);
+                return;
+            }
 
             const formData = new FormData();
             formData.append('image', file);
@@ -76,23 +129,15 @@ const SearchPage = () => {
             });
 
             if (response.data.data && Array.isArray(response.data.data)) {
-                setManyFoodData(response.data.data);
-                setPages(response.data.totalPages);
-                setSearchText(response.data.searchTerm);
-                if (response.data.hasOwnProperty('use_llm')) {
-                    if (!response.data.use_llm) {
-                        setError('Switching to a lower-tier model due to usage limits.');
-                    }
-                }
+                showResults(response.data.data, response.data.totalPages, response.data.searchTerm);
+                setNotice(`We think this is "${response.data.searchTerm}". Not right? Search by name or scan the barcode.`);
             }
-        } catch (error) {
-            setError('Failed to analyze image. Please try again.');
+        } catch (err) {
+            setError(errorMessage(err, 'Failed to analyze image. Please try again.'));
         } finally {
             setIsLoading(false);
             // Reset the input value to allow selecting the same file again
-            if (event.target) {
-                event.target.value = '';
-            }
+            input.value = '';
         }
     };
 
@@ -103,27 +148,28 @@ const SearchPage = () => {
         try {
             setIsLoading(true);
             setError(null);
-            const response = await axios.get(`${BASE_URL}/analyze-many-food/?name=${searchText}`);
-            setManyFoodData(response.data.data);
-            setPages(response.data.totalPages);
-        } catch (error) {
-            setError('Failed to find food with that name. Please try again.');
+            setNotice(null);
+            const response = await axios.get(`${BASE_URL}/analyze-many-food/`, {
+                params: { name: searchText.trim() }
+            });
+            showResults(response.data.data, response.data.totalPages);
+        } catch (err) {
+            setError(errorMessage(err, 'Failed to find food with that name. Please try again.'));
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleNextPage = async (page: number) => {
+    const handlePageChange = async (page: number) => {
         try {
             setIsLoading(true);
             setError(null);
-            const response = await axios.get(
-                `${BASE_URL}/analyze-many-food/?name=${searchText}&page=${page}`
-            );
-            setManyFoodData(response.data.data);
-            setPages(response.data.totalPages);
-        } catch (error) {
-            setError('Failed to load page. Please try again.');
+            const response = await axios.get(`${BASE_URL}/analyze-many-food/`, {
+                params: { name: searchText.trim(), page }
+            });
+            showResults(response.data.data, response.data.totalPages, undefined, page);
+        } catch (err) {
+            setError(errorMessage(err, 'Failed to load page. Please try again.'));
         } finally {
             setIsLoading(false);
         }
@@ -136,31 +182,25 @@ const SearchPage = () => {
         try {
             setIsLoading(true);
             setError(null);
-            const response = await axios.get(`${BASE_URL}/analyze-food/?fcID=${id}`);
-            const result = [response.data as FoodData];
-            setManyFoodData(result);
-        } catch (error) {
-            setError('Failed to find food with that ID. Please try again.');
+            setNotice(null);
+            const response = await axios.get(`${BASE_URL}/analyze-food/`, { params: { fcID: id } });
+            showResults([response.data as FoodData], 1);
+        } catch (err) {
+            setError(errorMessage(err, 'Failed to find food with that ID. Please try again.'));
         } finally {
             setIsLoading(false);
         }
     };
 
-    const openCamera = () => {
-        if (cameraInputRef.current) {
-            cameraInputRef.current.click();
-        }
-    };
-
     const resetSearch = () => {
-        setManyFoodData(null);
-        setSearchText('');
+        setSearchState(EMPTY_SEARCH_STATE);
         setID(null);
         setError(null);
+        setNotice(null);
     };
 
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        let interval: ReturnType<typeof setInterval> | undefined;
         if (isLoading) {
             interval = setInterval(() => {
                 setLoadingDelay((prev) => prev + 1);
@@ -180,6 +220,16 @@ const SearchPage = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-green-50 to-white py-12 px-4">
+            {showScanner && (
+                <Suspense fallback={
+                    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
+                        <div className="animate-spin h-10 w-10 border-4 border-green-500 border-t-transparent rounded-full" />
+                    </div>
+                }>
+                    <BarcodeScanner onDetected={lookupBarcode} onClose={() => setShowScanner(false)} />
+                </Suspense>
+            )}
+
             <div className="max-w-3xl mx-auto">
                 {/* Header with back button */}
                 <div className="flex items-center justify-between mb-6">
@@ -200,6 +250,13 @@ const SearchPage = () => {
                     <div className="bg-red-50 border-l-4 flex border-red-500 p-4 mb-6 rounded-md">
                         <p className="text-red-700">{error}</p>
                         <div className='ml-auto'><X size={24} className='text-red-700 cursor-pointer' onClick={() => setError(null)} /></div>
+                    </div>
+                )}
+
+                {notice && (
+                    <div className="bg-yellow-50 border-l-4 flex border-yellow-400 p-4 mb-6 rounded-md">
+                        <p className="text-yellow-800">{notice}</p>
+                        <div className='ml-auto'><X size={24} className='text-yellow-800 cursor-pointer' onClick={() => setNotice(null)} /></div>
                     </div>
                 )}
 
@@ -240,7 +297,7 @@ const SearchPage = () => {
                         </div>
                         <button
                             type="submit"
-                            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 
+                            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3
                                 rounded-lg font-semibold flex items-center justify-center"
                             disabled={isLoading}
                         >
@@ -252,7 +309,7 @@ const SearchPage = () => {
                             Search
                         </button>
                     </div>
-                    <div className="flex items-center gap-2 mt-3 ml-2">
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3 ml-2">
                         <div className="flex items-center gap-2 relative group">
                             <ToggleSwitch
                                 id="searchById"
@@ -269,9 +326,9 @@ const SearchPage = () => {
                                 </span>
                             </label>
                             {/* Tooltip */}
-                            <div className="absolute z-10 bottom-full left-1/2 transform -translate-x-1/2 mb-2 
-                                    w-64 p-3 bg-gray-800 text-white text-sm rounded-md shadow-lg 
-                                    opacity-0 group-hover:opacity-100 transition-opacity duration-300 
+                            <div className="absolute z-10 bottom-full left-1/2 transform -translate-x-1/2 mb-2
+                                    w-64 p-3 bg-gray-800 text-white text-sm rounded-md shadow-lg
+                                    opacity-0 group-hover:opacity-100 transition-opacity duration-300
                                     pointer-events-none">
                                 <p>FDCID is a unique identifier for food items in the USDA Food Data Central database.</p>
                                 <p className="mt-2 text-xs text-gray-300">
@@ -299,9 +356,9 @@ const SearchPage = () => {
                             </label>
 
                             {/* Tooltip */}
-                            <div className="absolute z-10 bottom-full left-1/2 transform -translate-x-1/2 mb-2 
-                                    w-64 p-3 bg-gray-800 text-white text-sm rounded-md shadow-lg 
-                                    opacity-0 group-hover:opacity-100 transition-opacity duration-300 
+                            <div className="absolute z-10 bottom-full left-1/2 transform -translate-x-1/2 mb-2
+                                    w-64 p-3 bg-gray-800 text-white text-sm rounded-md shadow-lg
+                                    opacity-0 group-hover:opacity-100 transition-opacity duration-300
                                     pointer-events-none">
                                 <p>Optical Character Recognition (OCR) helps extract text from images.</p>
                                 <p className="mt-2 text-xs text-gray-300">
@@ -324,7 +381,18 @@ const SearchPage = () => {
                                 New Search
                             </button>
                         </div>
-                        <FoodList foodItems={manyFoodData} pages={pages} handleNextPage={handleNextPage} />
+                        {isLoading ? (
+                            <div className="flex justify-center py-12">
+                                <div className="animate-spin h-10 w-10 border-4 border-green-500 border-t-transparent rounded-full" />
+                            </div>
+                        ) : (
+                            <FoodList
+                                foodItems={manyFoodData}
+                                pages={pages}
+                                currentPage={currentPage}
+                                onPageChange={handlePageChange}
+                            />
+                        )}
                     </div>
                 ) : (
                     <div>
@@ -335,30 +403,43 @@ const SearchPage = () => {
                             </div>
                         ) : (
                             <div>
-                                {/* Upload and Scan Options */}
-                                <div className="grid md:grid-cols-2 gap-6">
+                                {/* Scan options */}
+                                <div className="grid md:grid-cols-3 gap-6">
+                                    {/* Barcode Section */}
+                                    <div className="bg-white p-6 rounded-xl shadow-md text-center">
+                                        <h3 className="font-semibold text-lg mb-4">Scan Barcode</h3>
+                                        <button
+                                            onClick={() => setShowScanner(true)}
+                                            type="button"
+                                            className="w-full bg-gray-50 hover:bg-gray-100 rounded-lg p-8
+                                                border-2 border-dashed border-green-300 flex flex-col items-center"
+                                        >
+                                            <Barcode size={48} className="text-green-600 mb-4" />
+                                            <span className="text-gray-600">Best for packaged food</span>
+                                        </button>
+                                    </div>
+
                                     {/* Upload Section */}
                                     <div className="bg-white p-6 rounded-xl shadow-md text-center">
                                         <h3 className="font-semibold text-lg mb-4">Upload Food Image</h3>
-                                        <div className="mb-4">
-                                            <div
-                                                onClick={() => fileInputRef.current?.click()}
-                                                className="cursor-pointer bg-gray-50 hover:bg-gray-100 rounded-lg p-8 
+                                        <button
+                                            onClick={() => fileInputRef.current?.click()}
+                                            type="button"
+                                            className="w-full bg-gray-50 hover:bg-gray-100 rounded-lg p-8
                                                 border-2 border-dashed border-green-300 flex flex-col items-center"
-                                            >
-                                                <Upload size={48} className="text-green-600 mb-4" />
-                                                <span className="text-gray-600">Click to upload image</span>
-                                            </div>
-                                        </div>
+                                        >
+                                            <Upload size={48} className="text-green-600 mb-4" />
+                                            <span className="text-gray-600">Click to upload image</span>
+                                        </button>
                                     </div>
 
                                     {/* Camera Section */}
                                     <div className="bg-white p-6 rounded-xl shadow-md text-center">
                                         <h3 className="font-semibold text-lg mb-4">Use Camera</h3>
                                         <button
-                                            onClick={openCamera}
+                                            onClick={() => cameraInputRef.current?.click()}
                                             type="button"
-                                            className="w-full bg-gray-50 hover:bg-gray-100 rounded-lg p-8 
+                                            className="w-full bg-gray-50 hover:bg-gray-100 rounded-lg p-8
                                                 border-2 border-dashed border-green-300 flex flex-col items-center"
                                         >
                                             <Camera size={48} className="text-green-600 mb-4" />
@@ -371,14 +452,14 @@ const SearchPage = () => {
 
                                 {/* How to use section */}
                                 <div className="mt-12 bg-white p-6 rounded-xl shadow-md">
-                                    <h3 className="text-xl font-semibold mb-4">How to Use NutriScan</h3>
+                                    <h3 className="text-xl font-semibold mb-4">How to Use ScanMyFood</h3>
                                     <div className="grid md:grid-cols-3 gap-6">
                                         <div className="flex flex-col items-center text-center">
                                             <div className="bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mb-3">
                                                 <span className="text-xl font-bold text-green-600">1</span>
                                             </div>
                                             <h4 className="font-medium mb-1">Search or Scan</h4>
-                                            <p className="text-gray-600 text-sm">Search by name or take a picture of your food item</p>
+                                            <p className="text-gray-600 text-sm">Search by name, scan a barcode, or take a picture of your food</p>
                                         </div>
                                         <div className="flex flex-col items-center text-center">
                                             <div className="bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mb-3">
