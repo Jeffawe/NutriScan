@@ -164,6 +164,8 @@ const SearchPage = () => {
                 params: { name: searchText.trim() }
             });
             showResults(response.data.data, response.data.totalPages);
+            // e.g. "No exact match for ... Showing the closest results instead."
+            setNotice(response.data.notice ?? null);
         } catch (err) {
             setError(errorMessage(err, 'Failed to find food with that name. Please try again.'));
         } finally {

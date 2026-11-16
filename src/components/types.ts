@@ -39,7 +39,10 @@ export interface NutrientDisplayProps {
 export interface FoodData {
     basic_info: {
         name: string;
-        brand: string;
+        /** null for generic USDA reference foods, which aren't a company's product */
+        brand: string | null;
+        /** USDA dataType ("Branded", "Foundation", "SR Legacy", "Survey (FNDDS)") or "Open Food Facts" */
+        data_type?: string | null;
         id: number | null;
         upc: string | null;
         category: string | null;

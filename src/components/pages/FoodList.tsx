@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { FoodData } from '../types';
 import { useFoodContext } from '../FoodContext';
 import { Button } from '@/components/ui/button';
+import { brandLabel } from '@/lib/food';
 
 interface FoodListProps {
     foodItems: FoodData[];
@@ -87,7 +88,7 @@ const FoodList: React.FC<FoodListProps> = ({ foodItems = [], pages, currentPage,
                                         </h3>
                                         <div className="flex justify-between items-start">
                                             <p className="text-sm text-gray-500 mb-2">
-                                                {food.basic_info.brand || 'Unknown Brand'}
+                                                {brandLabel(food.basic_info)}
                                             </p>
                                             {food.basic_info.calories != null && (
                                                 <div>

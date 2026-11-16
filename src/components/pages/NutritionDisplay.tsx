@@ -19,6 +19,7 @@ import { DEFAULT_FOOD_DATA, FoodData, NutrientDisplayProps } from '../types';
 import { useFoodContext } from '../FoodContext';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
+import { brandLabel, GENERIC_FOOD_HELP } from '@/lib/food';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 const BASE_URL = import.meta.env.VITE_BASE_URL
@@ -79,11 +80,16 @@ const COLORS = ['#3b82f6', '#10b981', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899'
 const MacroDonutChart: React.FC<{ carbs?: number; protein?: number; fat?: number; calories?: number | null }> = ({ carbs, protein, fat, calories }) => {
     if (!carbs && !protein && !fat) return null;
 
-    const data = [
+    const raw = [
         { name: 'Carbs', value: carbs || 0, color: '#3b82f6' },
         { name: 'Protein', value: protein || 0, color: '#10b981' },
         { name: 'Fat', value: fat || 0, color: '#ef4444' },
     ].filter(item => item.value > 0);
+
+    // Shares come from grams x 4/4/9 kcal vs. the label's calories, which doesn't add up exactly
+    // (USDA uses food-specific energy factors), so scale them to a 100% split of calories.
+    const rawTotal = raw.reduce((sum, item) => sum + item.value, 0);
+    const data = raw.map(item => ({ ...item, value: rawTotal > 0 ? (item.value / rawTotal) * 100 : 0 }));
 
     return (
         <div className="flex justify-center items-center my-4">
@@ -98,23 +104,9 @@ const MacroDonutChart: React.FC<{ carbs?: number; protein?: number; fat?: number
                             outerRadius={60}
                             paddingAngle={2}
                             dataKey="value"
-                            label={({ cx, cy, midAngle, innerRadius, outerRadius, value }) => {
-                                const RADIAN = Math.PI / 180;
-                                const radius = 25 + (outerRadius - innerRadius);
-                                const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                                const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                                return (
-                                    <text
-                                        x={x}
-                                        y={y}
-                                        textAnchor={x > cx ? 'start' : 'end'}
-                                        dominantBaseline="central"
-                                        className="text-xs"
-                                    >
-                                        {`${Math.round(value)}%`}
-                                    </text>
-                                );
-                            }}
+                            // Percentages are in the colour-coded legend, so no labels on the ring
+                            label={false}
+                            labelLine={false}
                         >
                             {data.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={entry.color} />
@@ -465,7 +457,20 @@ const FoodNutritionDisplay: React.FC = () => {
                     </CardTitle>
                     <div className="text-sm text-gray-500 flex items-center gap-1 mt-1">
                         <Package size={14} />
-                        <span>{foodData.basic_info.brand}</span>
+                        <span>{brandLabel(basic_info)}</span>
+                        {!basic_info.brand && basic_info.data_type && basic_info.data_type !== 'Branded'
+                            && basic_info.data_type !== 'Open Food Facts' && (
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger className='bg-transparent border-none'>
+                                        <HelpCircle size={14} className="text-gray-400" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p className="max-w-xs">{GENERIC_FOOD_HELP}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        )}
                         {foodData.basic_info.category && (
                             <>
                                 <span className="mx-1">•</span>
