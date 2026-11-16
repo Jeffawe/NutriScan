@@ -136,7 +136,7 @@ const SearchPage = () => {
                 headers: {
                     'Content-Type': 'multipart/form-data'
                 },
-                timeout: 60000, // upload + Gemini + USDA can legitimately take longer
+                timeout: 75000, // upload + up to two Gemini attempts + USDA can take up to ~65s
             });
 
             if (response.data.data && Array.isArray(response.data.data)) {
