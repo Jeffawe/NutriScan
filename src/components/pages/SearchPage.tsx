@@ -11,12 +11,22 @@ const BarcodeScanner = lazy(() => import('../BarcodeScanner'));
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
+// Don't let a request spin forever if the server or network stalls
+axios.defaults.timeout = 30000;
+
 /** Prefer the backend's own error message (e.g. rate limit / not found) over a generic one. */
 const errorMessage = (err: unknown, fallback: string): string => {
     if (axios.isAxiosError(err)) {
         const data = err.response?.data as { error?: string; message?: string } | undefined;
         if (data?.message) return data.message;
         if (data?.error) return data.error;
+        if (!err.response) {
+            return err.code === 'ECONNABORTED'
+                ? 'The server took too long to respond. Please try again.'
+                : "Can't reach ScanMyFood right now. Check your connection and try again.";
+        }
+        if (err.response.status === 429) return 'Too many requests. Please wait a moment and try again.';
+        if (err.response.status >= 500) return 'ScanMyFood is busy right now. Please try again shortly.';
     }
     return fallback;
 };
@@ -125,7 +135,8 @@ const SearchPage = () => {
             const response = await axios.post(`${BASE_URL}/analyze-image/`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
-                }
+                },
+                timeout: 60000, // upload + Gemini + USDA can legitimately take longer
             });
 
             if (response.data.data && Array.isArray(response.data.data)) {
